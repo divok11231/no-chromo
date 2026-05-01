@@ -35,7 +35,12 @@ for i in range(iterations):
     z[mask] = z[mask]**2 + c[mask]
     diverged = np.abs(z) > 10.0
     escaping_now = diverged & mask
-    escape_counts[escaping_now] = i
+    
+    if np.any(escaping_now):
+        # i + 1 - log2(log2(|z|)) is jsut smoothening the curve by picking up individual point velocities
+        z_abs = np.abs(z[escaping_now])
+        escape_counts[escaping_now] = i + 1 - np.log2(np.log2(z_abs))
+        
     mask &= ~diverged
     if not np.any(mask):
         break
