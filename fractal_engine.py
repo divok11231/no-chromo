@@ -27,25 +27,23 @@ scale_factor = 255.0 / iterations
 c = get_complex_grid(dimen, dimen, center_x=-0.5, center_y=0, zoom=1.0)
 z = np.zeros((dimen, dimen), dtype=np.complex128)
 
-img_data = np.zeros((dimen, dimen), dtype=np.float32)
+mask = np.full(c.shape, True, dtype=bool)
+escape_counts = np.zeros(c.shape, dtype=float)
 
 # do iterations of mandelbrot set
 for i in range(iterations):
-	
-	z = z**2 + c
+    z[mask] = z[mask]**2 + c[mask]
+    diverged = np.abs(z) > 10.0
+    escaping_now = diverged & mask
+    escape_counts[escaping_now] = i
+    mask &= ~diverged
+    if not np.any(mask):
+        break
 
-	# mask for values that have not diverged
-	not_diverged = (np.abs(z)<4).astype(np.float32)
-
-	# add non-divergent spots to image data
-	img_data += not_diverged
-
-# set non-diverged values to 0
-img_data[img_data==img_data.max()] = 0
-
-# Convert to RGB image
+# Convert to RGB image using the escape counts
 img = np.zeros((dimen, dimen, 3), dtype=np.uint8)
-img[:, :, 0] = (img_data*scale_factor).astype(np.uint8)
+
+img[:, :, 0] = (escape_counts * scale_factor).astype(np.uint8)
 
 display = Image.fromarray(img, 'RGB')
 display.save('out.bmp')
