@@ -29,10 +29,19 @@ z = np.zeros((dimen, dimen), dtype=np.complex128)
 
 mask = np.full(c.shape, True, dtype=bool)
 escape_counts = np.zeros(c.shape, dtype=float)
+# Track minimum distance to axes (Pickover Stalks)
+trap_dist = np.full(c.shape, 1e10)
 
 # do iterations of mandelbrot set
 for i in range(iterations):
     z[mask] = z[mask]**2 + c[mask]
+    
+    # Update orbit trap distance for active points
+    # Pickover Stalks: distance to X or Y axis
+    dist_x = np.abs(z[mask].real)
+    dist_y = np.abs(z[mask].imag)
+    trap_dist[mask] = np.minimum(trap_dist[mask], np.minimum(dist_x, dist_y))
+    
     diverged = np.abs(z) > 10.0
     escaping_now = diverged & mask
     
@@ -45,25 +54,35 @@ for i in range(iterations):
     if not np.any(mask):
         break
 
-# normalizing values between 0 and 1
+# normalizing escape values
 norm = np.clip(escape_counts / iterations, 0, 1)
 norm = np.power(norm, 0.6)
 
-# dithering
-noise = (np.random.random(norm.shape) - 0.5) / 255.0
-norm = np.clip(norm + noise, 0, 1)
+# Normalize orbit trap distance (logarithmic scale for "smoky" feel)
+# 1e-6 prevents log(0), 10.0 is a tuning factor for contrast
+trap_norm = np.clip(-np.log(trap_dist + 1e-6) / 10.0, 0, 1)
 
-# sin gradient 
+combined_norm = np.clip(norm * 0.3 + trap_norm * 0.7, 0, 1)
+
+# visible dithering for chromostereopsis
+dither_noise = (np.random.random(combined_norm.shape) - 0.5) * 0.15
+dithered_norm = np.clip(combined_norm + dither_noise, 0, 1)
+
+# discrete red and blue coloring with black background
 img = np.zeros((dimen, dimen, 3), dtype=np.uint8)
 
-# Red
-img[:, :, 0] = (np.sin(norm * np.pi / 2) * 255).astype(np.uint8)
+bg_threshold = 0.2
+color_threshold = 0.6
 
-# Blue
-img[:, :, 2] = (np.sin(norm * np.pi) * 255).astype(np.uint8)
+# Blue channel: mid-range values
+blue_mask = (dithered_norm >= bg_threshold) & (dithered_norm < color_threshold)
+img[blue_mask, 2] = 255
 
-# Masking
-img[escape_counts == 0] = [0, 0, 0]
+# Red channel: high-range values
+red_mask = (dithered_norm >= color_threshold)
+img[red_mask, 0] = 255
+
+img[escape_counts == 0] = [255, 0, 0]
 
 display = Image.fromarray(img, 'RGB')
 display.save('out.bmp')
