@@ -45,10 +45,25 @@ for i in range(iterations):
     if not np.any(mask):
         break
 
-# Convert to RGB image using the escape counts
+# normalizing values between 0 and 1
+norm = np.clip(escape_counts / iterations, 0, 1)
+norm = np.power(norm, 0.6)
+
+# dithering
+noise = (np.random.random(norm.shape) - 0.5) / 255.0
+norm = np.clip(norm + noise, 0, 1)
+
+# sin gradient 
 img = np.zeros((dimen, dimen, 3), dtype=np.uint8)
 
-img[:, :, 0] = (escape_counts * scale_factor).astype(np.uint8)
+# Red
+img[:, :, 0] = (np.sin(norm * np.pi / 2) * 255).astype(np.uint8)
+
+# Blue
+img[:, :, 2] = (np.sin(norm * np.pi) * 255).astype(np.uint8)
+
+# Masking
+img[escape_counts == 0] = [0, 0, 0]
 
 display = Image.fromarray(img, 'RGB')
 display.save('out.bmp')
